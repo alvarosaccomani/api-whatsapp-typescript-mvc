@@ -43,3 +43,7 @@ coverage/
 
 # Archivos de sistema
 *.log
+
+# Sesiones de WhatsApp Web
+.wwebjs_auth/
+.wwebjs_cache/

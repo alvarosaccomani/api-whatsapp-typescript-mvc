@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    /* Proyecto */
+    "target": "ES2021",                          /* Versión de JavaScript de salida */
+    "module": "commonjs",                        /* Sistema de módulos */
+    "lib": ["ES2021"],                           /* Librerías incluidas */
+    "outDir": "./dist",                          /* Carpeta de salida */
+    "rootDir": "./src",                          /* Carpeta de entrada */
+
+    /* Estricto y seguro */
+    "strict": true,                              /* Habilita todas las verificaciones estrictas */
+    "esModuleInterop": true,                     /* Mejor interoperabilidad con CommonJS */
+    "skipLibCheck": true,                        /* Salta verificación de tipos en node_modules */
+    "forceConsistentCasingInFileNames": true,    /* Evita errores por mayúsculas/minúsculas */
+
+    /* Resolución de módulos */
+    "moduleResolution": "node",                  /* Usa resolución estilo Node.js */
+    "resolveJsonModule": true,                   /* Permite importar .json */
+
+    /* Source maps (útil para debugging) */
+    "sourceMap": true,                           /* Genera .map para depuración */
+    "inlineSources": true,
+
+    /* Decoradores (si los usas en el futuro) */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    /* No generar archivos innecesarios */
+    "declaration": false,
+    "removeComments": true
+  },
+  "include": [
+    "src/**/*"                                   /* Incluir todo dentro de src/ */
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "public"
+  ]
+}

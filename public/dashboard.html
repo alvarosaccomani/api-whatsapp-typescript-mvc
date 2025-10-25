@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp API Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+    }
+    header {
+      background: #128C7E;
+      padding: 15px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    header h1 {
+      color: white;
+      font-size: 24px;
+      text-align: center;
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .nav-btn {
+      background: #25D366;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: opacity 0.2s;
+    }
+    .nav-btn:hover { opacity: 0.9; }
+    .nav-btn.active { background: #128C7E; }
+
+    main {
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+    .view {
+      display: none;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .view.active {
+      display: block;
+    }
+
+    /* Estilos reutilizados de qr-viewer */
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 220px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #25D366;
+      color: white;
+      cursor: pointer;
+      width: auto;
+    }
+    .btn-warning { background: #ffaa00; }
+    .btn-danger { background: #ff4d4d; }
+    #qr-img {
+      display: none;
+      max-width: 300px;
+      margin: 20px auto;
+      border: 1px solid #eee;
+    }
+    .status { margin-top: 12px; font-weight: bold; min-height: 22px; }
+    .connected { color: green; }
+    .error { color: red; }
+    .info { color: #555; }
+
+    /* Tabla de sesiones */
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f0f0f0; }
+    .status-connected { color: green; }
+    .status-qr { color: orange; }
+    .status-error { color: red; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📱 WhatsApp API Dashboard</h1>
+    <nav>
+      <button class="nav-btn active" data-view="connect">Conectar</button>
+      <button class="nav-btn" data-view="sessions">Sesiones</button>
+      <button class="nav-btn" data-view="send">Enviar</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Vista: Conectar -->
+    <section id="connect-view" class="view active">
+      <h2>Conectar nueva sesión</h2>
+      <input type="text" id="sessionId" placeholder="Session ID (ej: cliente-123)" />
+      <br />
+      <button onclick="initSession()">Iniciar Sesión</button>
+      <div id="status" class="status info">Ingresa un Session ID</div>
+      
+      <div id="session-controls" style="display:none; margin-top:15px;">
+        <button class="btn-warning" onclick="restartSession()">🔄 Reiniciar QR</button>
+        <button class="btn-danger" onclick="closeSession()">❌ Cerrar Sesión</button>
+      </div>
+
+      <img id="qr-img" alt="QR Code" />
+    </section>
+
+    <!-- Vista: Sesiones -->
+    <section id="sessions-view" class="view">
+      <h2>Sesiones activas</h2>
+      <button onclick="loadSessions()" style="width:auto; margin-bottom:15px;">↻ Actualizar</button>
+      <div id="sessions-list">
+        <p>Cargando...</p>
+      </div>
+    </section>
+
+    <!-- Vista: Enviar -->
+    <section id="send-view" class="view">
+      <h2>Enviar mensaje</h2>
+      <p id="send-instructions">Primero conecta una sesión en la pestaña "Conectar".</p>
+      
+      <div id="send-form" style="display:none;">
+        <input type="text" id="send-sessionId" readonly />
+        <br />
+        <input type="text" id="phone" placeholder="Teléfono (ej: 5491112345678)" />
+        <br />
+        <input type="text" id="message" placeholder="Mensaje" />
+        <br />
+        <button onclick="sendMessage()">Enviar WhatsApp</button>
+        <div id="send-status" class="status"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ====== GESTIÓN DE VISTAS ======
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Actualizar botones activos
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Mostrar vista seleccionada
+        const view = btn.dataset.view;
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(`${view}-view`).classList.add('active');
+        
+        // Cargar sesiones si es la vista correspondiente
+        if (view === 'sessions') {
+          loadSessions();
+        }
+      });
+    });
+
+    // ====== VARIABLES GLOBALES ======
+    let currentSessionId = null;
+    let isConnected = false;
+
+    // ====== FUNCIÓN: Iniciar sesión ======
+    async function initSession() {
+      const sessionId = document.getElementById("sessionId").value?.trim();
+      if (!sessionId) return alert("Ingresa un Session ID");
+      
+      currentSessionId = sessionId;
+      showStatus("Iniciando sesión...");
+      
+      try {
+        const res = await fetch("/api/whatsapp/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId })
+        });
+        if (!res.ok) throw new Error("Error al iniciar");
+        
+        document.getElementById("session-controls").style.display = "block";
+        document.getElementById("qr-img").style.display = "block";
+        showStatus("⏳ Esperando QR...");
+        startPolling();
+        
+        // Actualizar formulario de envío
+        document.getElementById("send-sessionId").value = sessionId;
+        document.getElementById("send-instructions").style.display = "none";
+        document.getElementById("send-form").style.display = "block";
+      } catch (err) {
+        showStatus(`❌ Error: ${err.message}`, "error");
+      }
+    }
+
+    // ====== FUNCIÓN: Polling de estado ======
+    let pollInterval = null;
+    function startPolling() {
+      stopPolling();
+      pollInterval = setInterval(checkSessionStatus, 3000);
+      checkSessionStatus();
+    }
+    function stopPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+    }
+    async function checkSessionStatus() {
+      if (!currentSessionId) return;
+      try {
+        const res = await fetch(`/api/whatsapp/session/${currentSessionId}/qr`);
+        const data = await res.json();
+        const img = document.getElementById("qr-img");
+        
+        if (data.status === "CONNECTED") {
+          isConnected = true;
+          showStatus("✅ ¡Conectado! Puedes enviar mensajes.", "connected");
+          img.style.display = "none";
+        } else if (data.status === "QR_NEEDED") {
+          img.src = `/api/whatsapp/session/${currentSessionId}/qr/image?_t=${Date.now()}`;
+          img.style.display = "block";
+          showStatus("👇 Escanea este código con WhatsApp", "info");
+        } else {
+          showStatus(`Estado: ${data.status}`, "error");
+          img.style.display = "none";
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    }
+
+    // ====== FUNCIÓN: Mostrar estado ======
+    function showStatus(text, className = "info") {
+      const el = document.getElementById("status");
+      el.textContent = text;
+      el.className = "status " + className;
+    }
+
+    // ====== FUNCIÓN: Reiniciar sesión ======
+    async function restartSession() {
+      if (!currentSessionId) return;
+      showStatus("Reiniciando...");
+      try {
+        const res = await fetch("/api/whatsapp/restart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: currentSessionId })
+        });
+        if (res.ok) {
+          showStatus("Sesión reiniciada. Esperando nuevo QR...");
+          isConnected = false;
+          document.getElementById("qr-img").style.display = "block";
+        }
+      } catch (err) {
+        showStatus(`❌ Error: ${err.message}`, "error");
+      }
+    }
+
+    // ====== FUNCIÓN: Cerrar sesión ======
+    async function closeSession() {
+      if (!currentSessionId || !confirm("¿Cerrar sesión?")) return;
+      try {
+        const res = await fetch(`/api/whatsapp/session/${currentSessionId}`, { method: "DELETE" });
+        if (res.ok) {
+          stopPolling();
+          currentSessionId = null;
+          isConnected = false;
+          document.getElementById("session-controls").style.display = "none";
+          document.getElementById("qr-img").style.display = "none";
+          document.getElementById("send-form").style.display = "none";
+          document.getElementById("send-instructions").style.display = "block";
+          showStatus("Sesión cerrada.", "info");
+        }
+      } catch (err) {
+        showStatus(`❌ Error: ${err.message}`, "error");
+      }
+    }
+
+    // ====== FUNCIÓN: Enviar mensaje ======
+    async function sendMessage() {
+      const phone = document.getElementById("phone").value?.trim();
+      const message = document.getElementById("message").value?.trim();
+      const sendStatus = document.getElementById("send-status");
+      
+      if (!phone || !message || !currentSessionId) {
+        sendStatus.textContent = "Completa todos los campos";
+        sendStatus.className = "status error";
+        return;
+      }
+      
+      sendStatus.textContent = "Enviando...";
+      sendStatus.className = "status";
+      
+      try {
+        const res = await fetch("/api/whatsapp/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: currentSessionId, phone, message })
+        });
+        const result = await res.json();
+        if (res.ok) {
+          sendStatus.textContent = "✅ ¡Mensaje enviado!";
+          sendStatus.className = "status connected";
+          document.getElementById("phone").value = "";
+          document.getElementById("message").value = "";
+        } else {
+          sendStatus.textContent = `❌ ${result.error}`;
+          sendStatus.className = "status error";
+        }
+      } catch (err) {
+        sendStatus.textContent = `❌ Error: ${err.message}`;
+        sendStatus.className = "status error";
+      }
+    }
+
+    // ====== FUNCIÓN: Cargar sesiones ======
+    async function loadSessions() {
+      const container = document.getElementById("sessions-list");
+      try {
+        const res = await fetch("/api/whatsapp/sessions");
+        const sessions = await res.json();
+        
+        if (sessions.length === 0) {
+          container.innerHTML = "<p>No hay sesiones</p>";
+          return;
+        }
+        
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>Session ID</th>
+                <th>Estado</th>
+                <th>Última actualización</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        
+        sessions.forEach(s => {
+          const statusClass = 
+            s.status === "CONNECTED" ? "status-connected" :
+            s.status === "QR_NEEDED" ? "status-qr" : "status-error";
+          const statusText = 
+            s.status === "CONNECTED" ? "Conectado" :
+            s.status === "QR_NEEDED" ? "Esperando QR" : s.status;
+          
+          html += `
+            <tr>
+              <td><strong>${s.id}</strong></td>
+              <td class="${statusClass}">${statusText}</td>
+              <td>${new Date(s.lastUpdated).toLocaleString()}</td>
+            </tr>
+          `;
+        });
+        
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>

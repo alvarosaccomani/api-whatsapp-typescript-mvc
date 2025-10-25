@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import path from "path";
 import cors from "cors";
-import mongoose from "mongoose";
+import sequelize from "./config/database";
 import whatsappRoutes from "./routes/whatsapp.routes";
 
 const app = express();
@@ -24,10 +24,10 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/qr-viewer.html"));
 });
 
-// Conectar a MongoDB
-mongoose.connect(process.env.MONGO_URI as string)
-  .then(() => console.log("✅ Conectado a MongoDB"))
-  .catch(err => console.error("❌ Error en MongoDB:", err));
+// Conectar a PostgreSQL
+sequelize.authenticate()
+  .then(() => console.log("✅ Conectado a PostgreSQL"))
+  .catch(err => console.error("❌ Error en PostgreSQL:", err));
 
 // Iniciar servidor
 app.listen(PORT, () => {

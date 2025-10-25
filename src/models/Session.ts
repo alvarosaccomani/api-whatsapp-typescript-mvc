@@ -1,59 +1,74 @@
 // src/models/Session.ts
-import { Schema, model } from "mongoose";
+import { DataTypes, Model, Optional, Sequelize } from "sequelize";
+import sequelize from "../config/database";
 import { v4 as uuidv4 } from "uuid";
 
-// ✅ Interfaz para uso en la aplicación (lo que devuelve .lean())
-export interface Session {
-  uuid: string;
-  id: string;
-  qr?: string;
-  status: "INIT" | "QR_NEEDED" | "CONNECTED" | "AUTH_FAILED" | "DISCONNECTED";
-  lastUpdated: Date;
+// Atributos obligatorios al crear
+interface SessionCreationAttributes extends Optional<SessionAttributes, "ses_uuid" | "ses_lastupdated"> {}
+
+// Atributos del modelo (con nombres de campo reales)
+export interface SessionAttributes {
+    ses_uuid: string;
+    ses_id: string;
+    ses_qr?: string;
+    ses_status: "INIT" | "QR_NEEDED" | "CONNECTED" | "AUTH_FAILED" | "DISCONNECTED";
+    ses_lastupdated: Date;
 }
 
-// ✅ Esquema SIN tipado genérico (evita TS2590)
-const sessionSchema = new Schema({
-  uuid: {
-    type: String,
-    default: () => uuidv4(),
-    unique: true,
-    index: true,
-  },
-  id: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true,
-  },
-  qr: {
-    type: String,
-    default: null,
-  },
-  status: {
-    type: String,
-    required: true,
-    enum: ["INIT", "QR_NEEDED", "CONNECTED", "AUTH_FAILED", "DISCONNECTED"],
-    default: "INIT",
-  },
-  lastUpdated: {
-    type: Date,
-    default: Date.now,
-  },
-}, {
-  timestamps: false,
-});
+// Modelo de Sequelize
+export class Session
+    extends Model<SessionAttributes, SessionCreationAttributes>
+    implements SessionAttributes
+{
+    public ses_uuid!: string;
+    public ses_id!: string;
+    public ses_qr?: string;
+    public ses_status!: "INIT" | "QR_NEEDED" | "CONNECTED" | "AUTH_FAILED" | "DISCONNECTED";
+    public ses_lastupdated!: Date;
+}
 
-// ✅ Modelo SIN tipado genérico
-const SessionModel = model("Session", sessionSchema);
+// Inicializar el modelo con nombres de columna personalizados
+Session.init(
+    {
+      ses_uuid: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+        field: "ses_uuid", // nombre en la base de datos
+      },
+      ses_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+        field: "ses_id",
+      },
+      ses_qr: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: "ses_qr",
+      },
+      ses_status: {
+        type: DataTypes.ENUM("INIT", "QR_NEEDED", "CONNECTED", "AUTH_FAILED", "DISCONNECTED"),
+        allowNull: false,
+        defaultValue: "INIT",
+        field: "ses_status",
+      },
+      ses_lastupdated: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+        field: "ses_lastupdated",
+      },
+    },
+    {
+      sequelize,
+      modelName: "Session",
+      tableName: "ses_sessions", // nombre de la tabla
+      timestamps: false,
+    }
+);
 
-// ✅ Exportamos el modelo y una función helper para tipar .lean()
-export { SessionModel };
-
-// Helper para tipar resultados de .lean()
-export const toSession = (doc: any): Session => ({
-  uuid: doc.uuid,
-  id: doc.id,
-  qr: doc.qr,
-  status: doc.status,
-  lastUpdated: doc.lastUpdated,
-});
+// Sincronizar (solo en desarrollo)
+if (process.env.NODE_ENV !== "production") {
+    sequelize.sync();
+}

@@ -2,11 +2,21 @@
 import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js";
 import * as fs from "fs";
 import * as path from "path";
-import { SessionModel } from "../models/Session";
+import { Session } from "../models/Session";
 
 interface SendMessageInput {
-  phone: string;
-  message: string;
+    phone: string;
+    message: string;
+}
+
+interface SendMediaMessageInput {
+    phone: string;
+    caption?: string;
+    url?: string;
+    filePath?: string;
+    base64?: string;
+    mimeType?: string;
+    filename?: string;
 }
 
 class WhatsAppService {
@@ -24,74 +34,57 @@ class WhatsAppService {
         });
 
         // Inicializar en DB
-        SessionModel.findOneAndUpdate(
-            { id: sessionId },
-            { status: "INIT", lastUpdated: new Date() },
-            { upsert: true, setDefaultsOnInsert: true }
-        ).exec();
+        this.upsertSession("INIT");
 
         this.client.initialize();
 
         this.client.on("ready", () => {
             this.status = "CONNECTED";
-            SessionModel.updateOne({ id: sessionId }, { status: "CONNECTED", lastUpdated: new Date() }).exec();
+            this.upsertSession("CONNECTED");
             console.log(`✅ Sesión ${sessionId} conectada`);
         });
 
         this.client.on("auth_failure", () => {
             this.status = "AUTH_FAILED";
-            SessionModel.updateOne({ id: sessionId }, { status: "AUTH_FAILED", lastUpdated: new Date() }).exec();
+            this.upsertSession("AUTH_FAILED");
         });
 
         this.client.on("qr", (qr) => {
             this.status = "QR_NEEDED";
-            SessionModel.updateOne(
-                { id: sessionId },
-                { qr, status: "QR_NEEDED", lastUpdated: new Date() }
-            ).exec();
+            this.upsertSession("QR_NEEDED", qr);
         });
 
         this.client.on("disconnected", () => {
             this.status = "DISCONNECTED";
-            SessionModel.updateOne({ id: sessionId }, { status: "DISCONNECTED", lastUpdated: new Date() }).exec();
+            this.upsertSession("DISCONNECTED");
+        });
+    }
+
+    private async upsertSession(
+        status: "INIT" | "QR_NEEDED" | "CONNECTED" | "AUTH_FAILED" | "DISCONNECTED",
+        qr?: string
+    ) {
+        await Session.upsert({
+            ses_id: this.sessionId,
+            ses_qr: qr,
+            ses_status: status,
+            ses_lastupdated: new Date(),
         });
     }
 
     public static getInstance(sessionId: string): WhatsAppService {
         if (!WhatsAppService.instances.has(sessionId)) {
-        WhatsAppService.instances.set(sessionId, new WhatsAppService(sessionId));
+            WhatsAppService.instances.set(sessionId, new WhatsAppService(sessionId));
         }
         return WhatsAppService.instances.get(sessionId)!;
     }
 
     public async sendMessage({ phone, message }: SendMessageInput) {
         if (this.status !== "CONNECTED") {
-        throw new Error("SESSION_NOT_READY");
+            throw new Error("SESSION_NOT_READY");
         }
         const response = await this.client.sendMessage(`${phone}@c.us`, message);
         return { id: response.id.id };
-    }
-
-    public getStatus(): string {
-        return this.status;
-    }
-
-    public static async closeSession(sessionId: string): Promise<void> {
-        const instance = WhatsAppService.instances.get(sessionId);
-        if (instance) {
-            try {
-            await instance.client.destroy(); // Cierra WhatsApp Web
-            } catch (err) {
-            console.warn(`Error al destruir cliente ${sessionId}:`, err);
-            }
-            WhatsAppService.instances.delete(sessionId);
-        }
-
-        // Actualizar estado en DB
-        await SessionModel.updateOne(
-            { id: sessionId },
-            { status: "DISCONNECTED", lastUpdated: new Date() }
-        );
     }
 
     public async sendMediaMessage({
@@ -99,18 +92,10 @@ class WhatsAppService {
         caption = "",
         url,
         filePath,
-        base64,      // ✅ Nuevo parámetro
-        mimeType = "image/jpeg", // requerido si usas base64
-        filename = "image.jpg"
-    }: {
-        phone: string;
-        caption?: string;
-        url?: string;
-        filePath?: string;
-        base64?: string;         // ✅ base64 string
-        mimeType?: string;       // ej: "image/png", "image/jpeg"
-        filename?: string;
-    }) {
+        base64,
+        mimeType = "image/jpeg",
+        filename = "image.jpg",
+    }: SendMediaMessageInput) {
         if (this.status !== "CONNECTED") {
             throw new Error("SESSION_NOT_READY");
         }
@@ -118,7 +103,6 @@ class WhatsAppService {
         let media: MessageMedia;
 
         if (base64) {
-            // ✅ Usar base64 directamente
             media = new MessageMedia(mimeType, base64, filename);
         } else if (url) {
             media = await MessageMedia.fromUrl(url);
@@ -148,6 +132,23 @@ class WhatsAppService {
             ".mp3": "audio/mpeg",
         };
         return mimeTypes[ext] || "application/octet-stream";
+    }
+
+    public static async closeSession(sessionId: string): Promise<void> {
+        const instance = WhatsAppService.instances.get(sessionId);
+        if (instance) {
+            try {
+                await instance.client.destroy();
+            } catch (err) {
+                console.warn(`Error al destruir cliente ${sessionId}:`, err);
+            }
+            WhatsAppService.instances.delete(sessionId);
+        }
+
+        await Session.update(
+            { ses_status: "DISCONNECTED", ses_lastupdated: new Date() },
+            { where: { ses_id: sessionId } }
+        );
     }
 }
 

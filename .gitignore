@@ -47,3 +47,6 @@ coverage/
 # Sesiones de WhatsApp Web
 .wwebjs_auth/
 .wwebjs_cache/
+
+# Includes Word
+*copy*

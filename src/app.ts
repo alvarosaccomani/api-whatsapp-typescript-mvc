@@ -41,6 +41,15 @@ app.get("/health", async (req, res) => {
   }
 });
 
+app.get("/test-internet", async (req, res) => {
+  try {
+    const response = await fetch("https://web.whatsapp.com", { method: "HEAD" });
+    res.json({ online: true, status: response.status });
+  } catch (err: any) {
+    res.json({ online: false, error: err.message });
+  }
+});
+
 // Servir frontend estático (opcional)
 app.get("/manager", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/dashboard.html"));

@@ -34,15 +34,18 @@ class WhatsAppService {
                 headless: true,
                 executablePath: '/usr/bin/chromium-browser',
                 args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu',
+                    '--user-data-dir=/tmp/chromium-user-data',
+                    '--disk-cache-dir=/tmp/chromium-cache'
                 ]
-            }
+            },
+            takeoverTimeoutMs: 60000,
         });
 
         // ✅ Reiniciar cliente cada 24h para liberar memoria

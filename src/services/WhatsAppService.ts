@@ -32,18 +32,26 @@ class WhatsAppService {
             authStrategy: new LocalAuth({ clientId: sessionId }),
             puppeteer: {
                 headless: true,
+                executablePath: '/usr/bin/chromium-browser',
                 args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu'
-                ],
-            },
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
+                ]
+            }
         });
+
+        // ✅ Reiniciar cliente cada 24h para liberar memoria
+        setTimeout(() => {
+            console.log(`🔄 Reiniciando sesión ${sessionId} por mantenimiento`);
+            WhatsAppService.closeSession(sessionId);
+            // Opcional: volver a iniciar
+            // WhatsAppService.getInstance(sessionId);
+        }, 24 * 60 * 60 * 1000); // 24 horas
 
         // Inicializar en DB
         this.upsertSession("INIT");

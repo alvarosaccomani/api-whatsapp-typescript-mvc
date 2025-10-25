@@ -1,0 +1,22 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  api-whatsapp-typescript-mvc:
+    build: .
+    container_name: api-whatsapp-typescript-mvc
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST
+      - DB_PORT
+      - DB_USER
+      - DB_PASSWORD
+      - DB_NAME
+    networks:
+      - pgvector_default
+
+networks:
+  pgvector_default:
+    external: true

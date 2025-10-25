@@ -20,8 +20,8 @@ app.use(express.static(path.join(__dirname, "../public")));
 app.use("/api/whatsapp", whatsappRoutes);
 
 // Servir frontend estático (opcional)
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/qr-viewer.html"));
+app.get("/manager", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public/dashboard.html"));
 });
 
 // Conectar a PostgreSQL

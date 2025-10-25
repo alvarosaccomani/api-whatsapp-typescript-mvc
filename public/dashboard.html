@@ -24,24 +24,26 @@
     nav {
       display: flex;
       justify-content: center;
-      gap: 10px;
-      margin-top: 10px;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
     }
     .nav-btn {
       background: #25D366;
       color: white;
       border: none;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 20px;
       cursor: pointer;
       font-weight: bold;
+      font-size: 14px;
       transition: opacity 0.2s;
     }
     .nav-btn:hover { opacity: 0.9; }
     .nav-btn.active { background: #128C7E; }
 
     main {
-      max-width: 700px;
+      max-width: 750px;
       margin: 20px auto;
       padding: 0 20px;
     }
@@ -56,14 +58,14 @@
       display: block;
     }
 
-    /* Estilos reutilizados de qr-viewer */
-    input, button {
+    /* Formularios */
+    input, button, select {
       padding: 10px;
-      margin: 5px;
+      margin: 6px 0;
       font-size: 16px;
       border: 1px solid #ccc;
       border-radius: 6px;
-      width: 220px;
+      width: 100%;
       box-sizing: border-box;
     }
     button {
@@ -71,27 +73,38 @@
       color: white;
       cursor: pointer;
       width: auto;
+      display: inline-block;
     }
     .btn-warning { background: #ffaa00; }
     .btn-danger { background: #ff4d4d; }
+    .btn-image { background: #4A90E2; }
     #qr-img {
-      display: none;
+      display: block;
       max-width: 300px;
       margin: 20px auto;
       border: 1px solid #eee;
     }
-    .status { margin-top: 12px; font-weight: bold; min-height: 22px; }
-    .connected { color: green; }
-    .error { color: red; }
-    .info { color: #555; }
+    .status { margin: 12px 0; font-weight: bold; min-height: 22px; padding: 8px; border-radius: 4px; }
+    .connected { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+    .info { background: #d1ecf1; color: #0c5460; }
 
     /* Tabla de sesiones */
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
-    th { background: #f0f0f0; }
-    .status-connected { color: green; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; font-weight: bold; }
+    .status-connected { color: green; font-weight: bold; }
     .status-qr { color: orange; }
     .status-error { color: red; }
+    .action-btn {
+      padding: 6px 10px;
+      margin: 2px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .close-btn { background: #ff4d4d; color: white; }
   </style>
 </head>
 <body>
@@ -100,7 +113,8 @@
     <nav>
       <button class="nav-btn active" data-view="connect">Conectar</button>
       <button class="nav-btn" data-view="sessions">Sesiones</button>
-      <button class="nav-btn" data-view="send">Enviar</button>
+      <button class="nav-btn" data-view="send">Enviar Texto</button>
+      <button class="nav-btn" data-view="send-image">Enviar Imagen</button>
     </nav>
   </header>
 
@@ -118,32 +132,42 @@
         <button class="btn-danger" onclick="closeSession()">❌ Cerrar Sesión</button>
       </div>
 
-      <img id="qr-img" alt="QR Code" />
+      <img id="qr-img" alt="QR Code" style="display:none;" />
     </section>
 
     <!-- Vista: Sesiones -->
     <section id="sessions-view" class="view">
       <h2>Sesiones activas</h2>
-      <button onclick="loadSessions()" style="width:auto; margin-bottom:15px;">↻ Actualizar</button>
+      <button onclick="loadSessions()" style="width:auto;">↻ Actualizar</button>
       <div id="sessions-list">
         <p>Cargando...</p>
       </div>
     </section>
 
-    <!-- Vista: Enviar -->
+    <!-- Vista: Enviar Texto -->
     <section id="send-view" class="view">
-      <h2>Enviar mensaje</h2>
-      <p id="send-instructions">Primero conecta una sesión en la pestaña "Conectar".</p>
-      
+      <h2>Enviar mensaje de texto</h2>
+      <p id="send-instructions">Conecta una sesión primero.</p>
       <div id="send-form" style="display:none;">
-        <input type="text" id="send-sessionId" readonly />
-        <br />
+        <input type="text" id="send-sessionId" readonly placeholder="Session ID" />
         <input type="text" id="phone" placeholder="Teléfono (ej: 5491112345678)" />
-        <br />
         <input type="text" id="message" placeholder="Mensaje" />
-        <br />
         <button onclick="sendMessage()">Enviar WhatsApp</button>
-        <div id="send-status" class="status"></div>
+        <div id="send-status" class="status" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- Vista: Enviar Imagen -->
+    <section id="send-image-view" class="view">
+      <h2>Enviar imagen</h2>
+      <p id="image-instructions">Conecta una sesión primero.</p>
+      <div id="image-form" style="display:none;">
+        <input type="text" id="image-sessionId" readonly placeholder="Session ID" />
+        <input type="text" id="image-phone" placeholder="Teléfono (ej: 5491112345678)" />
+        <input type="text" id="image-caption" placeholder="Texto (opcional)" />
+        <input type="file" id="image-file" accept="image/*,application/pdf,video/*,audio/*" />
+        <button class="btn-image" onclick="sendImage()">📤 Enviar Imagen</button>
+        <div id="image-status" class="status" style="display:none;"></div>
       </div>
     </section>
   </main>
@@ -152,19 +176,11 @@
     // ====== GESTIÓN DE VISTAS ======
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        // Actualizar botones activos
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
-        // Mostrar vista seleccionada
-        const view = btn.dataset.view;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(`${view}-view`).classList.add('active');
-        
-        // Cargar sesiones si es la vista correspondiente
-        if (view === 'sessions') {
-          loadSessions();
-        }
+        document.getElementById(`${btn.dataset.view}-view`).classList.add('active');
+        if (btn.dataset.view === 'sessions') loadSessions();
       });
     });
 
@@ -176,9 +192,8 @@
     async function initSession() {
       const sessionId = document.getElementById("sessionId").value?.trim();
       if (!sessionId) return alert("Ingresa un Session ID");
-      
       currentSessionId = sessionId;
-      showStatus("Iniciando sesión...");
+      showStatus("Iniciando sesión...", "info", "status");
       
       try {
         const res = await fetch("/api/whatsapp/init", {
@@ -190,19 +205,30 @@
         
         document.getElementById("session-controls").style.display = "block";
         document.getElementById("qr-img").style.display = "block";
-        showStatus("⏳ Esperando QR...");
+        showStatus("⏳ Esperando QR...", "info", "status");
         startPolling();
         
-        // Actualizar formulario de envío
+        // Actualizar formularios
         document.getElementById("send-sessionId").value = sessionId;
+        document.getElementById("image-sessionId").value = sessionId;
         document.getElementById("send-instructions").style.display = "none";
+        document.getElementById("image-instructions").style.display = "none";
         document.getElementById("send-form").style.display = "block";
+        document.getElementById("image-form").style.display = "block";
       } catch (err) {
-        showStatus(`❌ Error: ${err.message}`, "error");
+        showStatus(`❌ Error: ${err.message}`, "error", "status");
       }
     }
 
-    // ====== FUNCIÓN: Polling de estado ======
+    // ====== FUNCIÓN: Mostrar estado ======
+    function showStatus(text, type = "info", elementId = "status") {
+      const el = document.getElementById(elementId);
+      el.textContent = text;
+      el.className = "status " + type;
+      el.style.display = "block";
+    }
+
+    // ====== POLLING ======
     let pollInterval = null;
     function startPolling() {
       stopPolling();
@@ -221,14 +247,14 @@
         
         if (data.status === "CONNECTED") {
           isConnected = true;
-          showStatus("✅ ¡Conectado! Puedes enviar mensajes.", "connected");
+          showStatus("✅ ¡Conectado! Puedes enviar mensajes.", "connected", "status");
           img.style.display = "none";
         } else if (data.status === "QR_NEEDED") {
           img.src = `/api/whatsapp/session/${currentSessionId}/qr/image?_t=${Date.now()}`;
           img.style.display = "block";
-          showStatus("👇 Escanea este código con WhatsApp", "info");
+          showStatus("👇 Escanea este código con WhatsApp", "info", "status");
         } else {
-          showStatus(`Estado: ${data.status}`, "error");
+          showStatus(`Estado: ${data.status}`, "error", "status");
           img.style.display = "none";
         }
       } catch (err) {
@@ -236,17 +262,10 @@
       }
     }
 
-    // ====== FUNCIÓN: Mostrar estado ======
-    function showStatus(text, className = "info") {
-      const el = document.getElementById("status");
-      el.textContent = text;
-      el.className = "status " + className;
-    }
-
-    // ====== FUNCIÓN: Reiniciar sesión ======
+    // ====== SESIÓN: Reiniciar / Cerrar ======
     async function restartSession() {
       if (!currentSessionId) return;
-      showStatus("Reiniciando...");
+      showStatus("Reiniciando...", "info", "status");
       try {
         const res = await fetch("/api/whatsapp/restart", {
           method: "POST",
@@ -254,16 +273,15 @@
           body: JSON.stringify({ sessionId: currentSessionId })
         });
         if (res.ok) {
-          showStatus("Sesión reiniciada. Esperando nuevo QR...");
+          showStatus("Sesión reiniciada. Esperando nuevo QR...", "info", "status");
           isConnected = false;
           document.getElementById("qr-img").style.display = "block";
         }
       } catch (err) {
-        showStatus(`❌ Error: ${err.message}`, "error");
+        showStatus(`❌ Error: ${err.message}`, "error", "status");
       }
     }
 
-    // ====== FUNCIÓN: Cerrar sesión ======
     async function closeSession() {
       if (!currentSessionId || !confirm("¿Cerrar sesión?")) return;
       try {
@@ -275,29 +293,26 @@
           document.getElementById("session-controls").style.display = "none";
           document.getElementById("qr-img").style.display = "none";
           document.getElementById("send-form").style.display = "none";
+          document.getElementById("image-form").style.display = "none";
           document.getElementById("send-instructions").style.display = "block";
-          showStatus("Sesión cerrada.", "info");
+          document.getElementById("image-instructions").style.display = "block";
+          showStatus("Sesión cerrada.", "info", "status");
         }
       } catch (err) {
-        showStatus(`❌ Error: ${err.message}`, "error");
+        showStatus(`❌ Error: ${err.message}`, "error", "status");
       }
     }
 
-    // ====== FUNCIÓN: Enviar mensaje ======
+    // ====== ENVIAR TEXTO ======
     async function sendMessage() {
       const phone = document.getElementById("phone").value?.trim();
       const message = document.getElementById("message").value?.trim();
-      const sendStatus = document.getElementById("send-status");
-      
       if (!phone || !message || !currentSessionId) {
-        sendStatus.textContent = "Completa todos los campos";
-        sendStatus.className = "status error";
+        showStatus("Completa todos los campos", "error", "send-status");
         return;
       }
       
-      sendStatus.textContent = "Enviando...";
-      sendStatus.className = "status";
-      
+      showStatus("Enviando...", "info", "send-status");
       try {
         const res = await fetch("/api/whatsapp/send", {
           method: "POST",
@@ -306,21 +321,65 @@
         });
         const result = await res.json();
         if (res.ok) {
-          sendStatus.textContent = "✅ ¡Mensaje enviado!";
-          sendStatus.className = "status connected";
+          showStatus("✅ ¡Mensaje enviado!", "connected", "send-status");
           document.getElementById("phone").value = "";
           document.getElementById("message").value = "";
         } else {
-          sendStatus.textContent = `❌ ${result.error}`;
-          sendStatus.className = "status error";
+          showStatus(`❌ ${result.error}`, "error", "send-status");
         }
       } catch (err) {
-        sendStatus.textContent = `❌ Error: ${err.message}`;
-        sendStatus.className = "status error";
+        showStatus(`❌ Error: ${err.message}`, "error", "send-status");
       }
     }
 
-    // ====== FUNCIÓN: Cargar sesiones ======
+    // ====== ENVIAR IMAGEN ======
+    async function sendImage() {
+      const phone = document.getElementById("image-phone").value?.trim();
+      const caption = document.getElementById("image-caption").value?.trim();
+      const fileInput = document.getElementById("image-file");
+      const file = fileInput.files[0];
+      
+      if (!phone || !file || !currentSessionId) {
+        showStatus("Selecciona un archivo y completa el teléfono", "error", "image-status");
+        return;
+      }
+      
+      if (file.size > 16 * 1024 * 1024) {
+        showStatus("❌ El archivo debe pesar menos de 16 MB", "error", "image-status");
+        return;
+      }
+      
+      showStatus("Procesando imagen...", "info", "image-status");
+      
+        // Convertir a base64
+        const reader = new FileReader();
+        reader.onload = async () => {
+        const base64 = reader.result.split(",")[1]; // ✅ CORRECTO
+        const mimeType = file.type || "image/jpeg";
+        const filename = file.name;
+        
+        try {
+            const res = await fetch("/api/whatsapp/send-media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                sessionId: currentSessionId,
+                phone,
+                caption,
+                base64,
+                mimeType,
+                filename
+            })
+            });
+            // ... resto del código
+        } catch (err) {
+            showStatus(`❌ Error: ${err.message}`, "error", "image-status");
+        }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ====== LISTAR SESIONES ======
     async function loadSessions() {
       const container = document.getElementById("sessions-list");
       try {
@@ -328,7 +387,7 @@
         const sessions = await res.json();
         
         if (sessions.length === 0) {
-          container.innerHTML = "<p>No hay sesiones</p>";
+          container.innerHTML = "<p>No hay sesiones activas</p>";
           return;
         }
         
@@ -339,6 +398,7 @@
                 <th>Session ID</th>
                 <th>Estado</th>
                 <th>Última actualización</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -357,6 +417,11 @@
               <td><strong>${s.id}</strong></td>
               <td class="${statusClass}">${statusText}</td>
               <td>${new Date(s.lastUpdated).toLocaleString()}</td>
+              <td>
+                <button class="action-btn close-btn" onclick="closeSessionFromList('${s.id}')">
+                  ❌ Cerrar
+                </button>
+              </td>
             </tr>
           `;
         });
@@ -364,7 +429,36 @@
         html += `</tbody></table>`;
         container.innerHTML = html;
       } catch (err) {
-        container.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+        container.innerHTML = `<p class="status error">Error al cargar sesiones: ${err.message}</p>`;
+      }
+    }
+
+    // ====== CERRAR SESIÓN DESDE LISTA ======
+    async function closeSessionFromList(sessionId) {
+      if (!confirm(`¿Cerrar sesión "${sessionId}"?`)) return;
+      try {
+        const res = await fetch(`/api/whatsapp/session/${sessionId}`, { method: "DELETE" });
+        if (res.ok) {
+          alert("Sesión cerrada");
+          loadSessions();
+          // Si es la sesión actual, resetear
+          if (currentSessionId === sessionId) {
+            stopPolling();
+            currentSessionId = null;
+            isConnected = false;
+            document.getElementById("session-controls").style.display = "none";
+            document.getElementById("qr-img").style.display = "none";
+            document.getElementById("send-form").style.display = "none";
+            document.getElementById("image-form").style.display = "none";
+            document.getElementById("send-instructions").style.display = "block";
+            document.getElementById("image-instructions").style.display = "block";
+            showStatus("Sesión cerrada.", "info", "status");
+          }
+        } else {
+          alert("Error al cerrar sesión");
+        }
+      } catch (err) {
+        alert("Error de red: " + err.message);
       }
     }
   </script>

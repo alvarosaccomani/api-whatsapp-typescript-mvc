@@ -4,9 +4,9 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependencias de producción
+# Instalar TODAS las dependencias (dev + production) para compilar TypeScript
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci && npm cache clean --force
 
 # Copiar código fuente
 COPY . .
@@ -15,12 +15,12 @@ COPY . .
 RUN npm run build
 
 
-# Etapa 2: Imagen final
+# Etapa 2: Imagen final (solo producción)
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Instalar Chromium (requerido por puppeteer)
+# Instalar Chromium
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -29,7 +29,7 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont
 
-# Instalar solo dependencias de producción
+# Solo dependencias de producción
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
@@ -41,8 +41,6 @@ COPY --from=builder /app/public ./public
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV NODE_ENV=production
 
-# Puerto
 EXPOSE 3000
 
-# Comando de inicio
 CMD ["node", "dist/app.js"]

@@ -4,7 +4,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copiar solo lo necesario para instalar dependencias
+# Instalar dependencias de producción
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
@@ -15,35 +15,33 @@ COPY . .
 RUN npm run build
 
 
-# Etapa 2: Imagen final (liviana)
+# Etapa 2: Imagen final
 FROM node:18-alpine
 
 WORKDIR /app
+
+# Instalar Chromium (requerido por puppeteer)
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
 
 # Instalar solo dependencias de producción
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# Copiar la app compilada
+# Copiar app compilada y assets
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public  # si usas frontend estático
-
-# Instalar Chromium (requerido por puppeteer)
-# puppeteer >= v22 requiere estos paquetes en Alpine
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    freetype-dev \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont
+COPY --from=builder /app/public ./public
 
 # Configurar entorno
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV NODE_ENV=production
 
-# Exponer puerto
+# Puerto
 EXPOSE 3000
 
 # Comando de inicio

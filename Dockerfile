@@ -1,21 +1,13 @@
 # Dockerfile
-# Etapa 1: Construcción
 FROM node:18-alpine AS builder
 
 WORKDIR /app
-
-# Instalar TODAS las dependencias (dev + production) para compilar TypeScript
 COPY package*.json ./
 RUN npm ci && npm cache clean --force
-
-# Copiar código fuente
 COPY . .
-
-# Compilar TypeScript
 RUN npm run build
 
 
-# Etapa 2: Imagen final (solo producción)
 FROM node:18-alpine
 
 WORKDIR /app
@@ -29,15 +21,17 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont
 
-# Solo dependencias de producción
+# Instalar dependencias de producción
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# Copiar app compilada y assets
+# Copiar app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 
-# Configurar entorno
+# Crear carpeta de sesiones (asegurar permisos)
+RUN mkdir -p .wwebjs_auth && chmod -R 777 .wwebjs_auth
+
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV NODE_ENV=production
 

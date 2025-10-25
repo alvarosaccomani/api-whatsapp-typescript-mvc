@@ -14,8 +14,15 @@ services:
       - DB_USER
       - DB_PASSWORD
       - DB_NAME
+    volumes:
+      - /home/ats/docker/api-whatsapp:/app/.wwebjs_auth
     networks:
       - pgvector_default
+    mem_limit: 1g
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
 networks:
   pgvector_default:

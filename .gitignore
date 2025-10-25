@@ -50,3 +50,7 @@ coverage/
 
 # Includes Word
 *copy*
+
+# Incluir archivos .js en la carpeta public/
+!public/
+!public/**/*.js

@@ -29,13 +29,6 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont
 
-# Crear un usuario no-root
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S whatsapp -u 1001
-
-# Cambiar al usuario no-root
-USER whatsapp
-
 # Solo dependencias de producción
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force

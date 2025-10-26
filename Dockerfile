@@ -19,9 +19,9 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Instalar Chromium y dependencias necesarias
+# Instalar Chromium y dependencias necesarias (sin chromium-browser)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium-browser \
+    chromium \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -53,7 +53,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    lsb-release \
     wget \
     xdg-utils \
     dumb-init \
@@ -76,18 +75,15 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/cleanup.sh /app/entrypoint.sh
 
 # Variables de entorno para Puppeteer
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV NODE_ENV=production
 
-# Flags para Puppeteer (evita errores comunes)
+# Flags para Puppeteer
 ENV PUPPETEER_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --no-zygote --single-process --disable-extensions"
 
 # Exponer el puerto de la API
 EXPOSE 3000
 
-# Iniciar con dumb-init (mejor manejo de señales)
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-
-# Ejecutar script de inicio
 CMD ["/app/entrypoint.sh"]

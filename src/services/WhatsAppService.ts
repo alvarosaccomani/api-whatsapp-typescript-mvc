@@ -47,20 +47,23 @@ class WhatsAppService {
                     '--disable-renderer-backgrounding',
                     '--disable-features=VizDisplayCompositor',
                     '--disable-ipc-flooding-protection',
-                    '--disable-web-security', // ⚠️ Solo en entornos aislados
+                    '--disable-web-security',
                     '--allow-running-insecure-content'
                 ]
             },
             takeoverTimeoutMs: 120000
         });
 
-        // ✅ Reiniciar cliente cada 24h para liberar memoria
-        setTimeout(() => {
+        // Reiniciar cliente cada 24h (solo si está conectado)
+        const maintenanceTimeout = setTimeout(() => {
             console.log(`🔄 Reiniciando sesión ${sessionId} por mantenimiento`);
             WhatsAppService.closeSession(sessionId);
-            // Opcional: volver a iniciar
-            // WhatsAppService.getInstance(sessionId);
         }, 24 * 60 * 60 * 1000); // 24 horas
+
+        // Limpiar timeout si la sesión se cierra antes
+        this.client.on("disconnected", () => {
+            clearTimeout(maintenanceTimeout);
+        });
 
         // Inicializar en DB
         this.upsertSession("INIT");
@@ -97,7 +100,7 @@ class WhatsAppService {
             ses_id: this.sessionId,
             ses_qr: qr,
             ses_status: status,
-            ses_lastupdated: new Date(),
+            ses_lastupdated: new Date()
         });
     }
 

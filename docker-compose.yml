@@ -14,8 +14,8 @@ services:
       - DB_USER
       - DB_PASSWORD
       - DB_NAME
-    volumes:
-      - /home/ats/docker/api-whatsapp:/app/.wwebjs_auth
+      - NODE_ENV=production
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
     networks:
       - pgvector_default
     mem_limit: 1.5g
@@ -27,6 +27,9 @@ services:
       resources:
         limits:
           memory: 1.5G
+    # Comando para asegurarse de que la carpeta .wwebjs_auth exista
+    entrypoint: >
+      sh -c "mkdir -p /app/.wwebjs_auth && chmod -R 777 /app/.wwebjs_auth && /app/entrypoint.sh"
 
 networks:
   pgvector_default:

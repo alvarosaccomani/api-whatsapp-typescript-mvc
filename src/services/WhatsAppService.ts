@@ -22,7 +22,7 @@ interface SendMediaMessageInput {
 class WhatsAppService {
     private static instances: Map<string, WhatsAppService> = new Map();
 
-    private client: Client;
+    private client!: Client;
     private sessionId: string;
     private status: string = "INIT";
 
@@ -45,29 +45,31 @@ class WhatsAppService {
             }),
             puppeteer: {
                 headless: true,
-                executablePath:
-                    process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
                     "--disable-dev-shm-usage",
-                    "--disable-extensions",
                     "--disable-gpu",
-                    "--single-process",
-                    "--no-zygote",
-                    "--no-first-run",
+                    "--disable-extensions",
                     "--disable-background-timer-throttling",
                     "--disable-renderer-backgrounding",
                     "--disable-software-rasterizer",
+                    "--disable-dev-tools",
+                    "--mute-audio",
+                    "--hide-scrollbars",
+                    "--no-first-run",
+                    "--no-zygote",
                     "--disable-infobars",
-                    "--disable-features=VizDisplayCompositor",
-                    `--user-data-dir=${chromiumProfileDir}` // 👈 Perfil único
+                    "--disable-notifications",
+                    "--disable-features=site-per-process,TranslateUI,BlinkGenPropertyTrees",
+                    `--user-data-dir=${chromiumProfileDir}`,
                 ],
             },
             takeoverTimeoutMs: 120000,
         });
 
-        // Reinicio automático cada 24 horas (opcional)
+        // Reinicio automático cada 24 horas
         const maintenanceTimeout = setTimeout(() => {
             console.log(`🔄 Reiniciando sesión ${sessionId} por mantenimiento`);
             WhatsAppService.closeSession(sessionId);
@@ -75,12 +77,32 @@ class WhatsAppService {
 
         this.client.on("disconnected", () => clearTimeout(maintenanceTimeout));
 
-        // Guardar estado inicial en la base
+        // Guardar estado inicial
         this.upsertSession("INIT");
 
-        // Inicializar cliente
-        this.client.initialize();
+        // 🧠 Inicializar cliente con manejo de errores
+        (async () => {
+            try {
+                console.log(`🚀 Iniciando cliente WhatsApp para sesión ${sessionId}...`);
+                await this.client.initialize();
+                console.log(`✅ Cliente WhatsApp iniciado correctamente (${sessionId})`);
+            } catch (err: any) {
+                console.error(`❌ Error al inicializar WhatsApp (${sessionId}):`, err.message || err);
+                this.status = "DISCONNECTED";
+                await this.upsertSession("DISCONNECTED");
 
+                // 🔁 Intento de reinicio en caso de error por Chromium cerrado
+                if (err.message?.includes("Session closed") || err.message?.includes("Failed to launch")) {
+                    console.warn(`♻️ Reintentando inicialización de sesión ${sessionId} en 10 segundos...`);
+                    setTimeout(() => {
+                        WhatsAppService.closeSession(sessionId);
+                        WhatsAppService.getInstance(sessionId);
+                    }, 10000);
+                }
+            }
+        })();
+
+        // Eventos de estado
         this.client.on("ready", () => {
             this.status = "CONNECTED";
             this.upsertSession("CONNECTED");
@@ -90,16 +112,19 @@ class WhatsAppService {
         this.client.on("auth_failure", () => {
             this.status = "AUTH_FAILED";
             this.upsertSession("AUTH_FAILED");
+            console.error(`⚠️ Fallo de autenticación en sesión ${sessionId}`);
         });
 
         this.client.on("qr", (qr) => {
             this.status = "QR_NEEDED";
             this.upsertSession("QR_NEEDED", qr);
+            console.log(`📱 QR generado para sesión ${sessionId}`);
         });
 
         this.client.on("disconnected", () => {
             this.status = "DISCONNECTED";
             this.upsertSession("DISCONNECTED");
+            console.log(`🔌 Sesión ${sessionId} desconectada`);
         });
     }
 
@@ -107,12 +132,16 @@ class WhatsAppService {
         status: "INIT" | "QR_NEEDED" | "CONNECTED" | "AUTH_FAILED" | "DISCONNECTED",
         qr?: string
     ) {
-        await Session.upsert({
-            ses_id: this.sessionId,
-            ses_qr: qr,
-            ses_status: status,
-            ses_lastupdated: new Date(),
-        });
+        try {
+            await Session.upsert({
+                ses_id: this.sessionId,
+                ses_qr: qr,
+                ses_status: status,
+                ses_lastupdated: new Date(),
+            });
+        } catch (err) {
+            console.error(`Error al actualizar estado de sesión ${this.sessionId}:`, err);
+        }
     }
 
     public static getInstance(sessionId: string): WhatsAppService {
@@ -126,8 +155,14 @@ class WhatsAppService {
         if (this.status !== "CONNECTED") {
             throw new Error("SESSION_NOT_READY");
         }
-        const response = await this.client.sendMessage(`${phone}@c.us`, message);
-        return { id: response.id.id };
+
+        try {
+            const response = await this.client.sendMessage(`${phone}@c.us`, message);
+            return { id: response.id.id };
+        } catch (err: any) {
+            console.error(`❌ Error al enviar mensaje a ${phone}:`, err.message || err);
+            throw new Error("SEND_MESSAGE_FAILED");
+        }
     }
 
     public async sendMediaMessage({
@@ -143,24 +178,29 @@ class WhatsAppService {
             throw new Error("SESSION_NOT_READY");
         }
 
-        let media: MessageMedia;
+        try {
+            let media: MessageMedia;
 
-        if (base64) {
-            media = new MessageMedia(mimeType, base64, filename);
-        } else if (url) {
-            media = await MessageMedia.fromUrl(url);
-        } else if (filePath) {
-            const detectedMimeType = this.getMimeType(filePath);
-            const data = fs.readFileSync(filePath).toString("base64");
-            const name = path.basename(filePath);
-            media = new MessageMedia(detectedMimeType, data, name);
-        } else {
-            throw new Error("Se requiere 'url', 'filePath' o 'base64'");
+            if (base64) {
+                media = new MessageMedia(mimeType, base64, filename);
+            } else if (url) {
+                media = await MessageMedia.fromUrl(url);
+            } else if (filePath) {
+                const detectedMimeType = this.getMimeType(filePath);
+                const data = fs.readFileSync(filePath).toString("base64");
+                const name = path.basename(filePath);
+                media = new MessageMedia(detectedMimeType, data, name);
+            } else {
+                throw new Error("Se requiere 'url', 'filePath' o 'base64'");
+            }
+
+            const chatId = `${phone}@c.us`;
+            const response = await this.client.sendMessage(chatId, media, { caption });
+            return { id: response.id.id };
+        } catch (err: any) {
+            console.error(`❌ Error al enviar media a ${phone}:`, err.message || err);
+            throw new Error("SEND_MEDIA_FAILED");
         }
-
-        const chatId = `${phone}@c.us`;
-        const response = await this.client.sendMessage(chatId, media, { caption });
-        return { id: response.id.id };
     }
 
     private getMimeType(filename: string): string {

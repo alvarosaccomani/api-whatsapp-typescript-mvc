@@ -18,7 +18,7 @@ services:
       - /home/ats/docker/api-whatsapp:/app/.wwebjs_auth
     networks:
       - pgvector_default
-    mem_limit: 1g
+    mem_limit: 1.5g
     shm_size: 1g
     dns:
       - 8.8.8.8
@@ -26,7 +26,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 1.5G
 
 networks:
   pgvector_default:

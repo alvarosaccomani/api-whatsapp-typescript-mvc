@@ -28,46 +28,57 @@ class WhatsAppService {
 
     private constructor(sessionId: string) {
         this.sessionId = sessionId;
+
+        // Directorio temporal único para Chromium
+        const chromiumProfileDir = `/tmp/chromium_profile_${sessionId}_${Date.now()}`;
+        if (!fs.existsSync(chromiumProfileDir)) {
+            fs.mkdirSync(chromiumProfileDir, { recursive: true });
+        }
+
+        // Directorio persistente para las sesiones (montado como volumen)
+        const authPath = path.join(__dirname, "../../.wwebjs_auth");
+
         this.client = new Client({
-            authStrategy: new LocalAuth({ clientId: sessionId }),
+            authStrategy: new LocalAuth({
+                clientId: sessionId,
+                dataPath: authPath,
+            }),
             puppeteer: {
                 headless: true,
-                executablePath: '/usr/bin/chromium-browser',
+                executablePath:
+                    process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
                 args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu',
-                    '--disable-software-rasterizer',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding',
-                    '--disable-features=VizDisplayCompositor',
-                    '--disable-ipc-flooding-protection',
-                    '--disable-web-security',
-                    '--allow-running-insecure-content'
-                ]
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-extensions",
+                    "--disable-gpu",
+                    "--single-process",
+                    "--no-zygote",
+                    "--no-first-run",
+                    "--disable-background-timer-throttling",
+                    "--disable-renderer-backgrounding",
+                    "--disable-software-rasterizer",
+                    "--disable-infobars",
+                    "--disable-features=VizDisplayCompositor",
+                    `--user-data-dir=${chromiumProfileDir}` // 👈 Perfil único
+                ],
             },
-            takeoverTimeoutMs: 120000
+            takeoverTimeoutMs: 120000,
         });
 
-        // Reiniciar cliente cada 24h (solo si está conectado)
+        // Reinicio automático cada 24 horas (opcional)
         const maintenanceTimeout = setTimeout(() => {
             console.log(`🔄 Reiniciando sesión ${sessionId} por mantenimiento`);
             WhatsAppService.closeSession(sessionId);
-        }, 24 * 60 * 60 * 1000); // 24 horas
+        }, 24 * 60 * 60 * 1000);
 
-        // Limpiar timeout si la sesión se cierra antes
-        this.client.on("disconnected", () => {
-            clearTimeout(maintenanceTimeout);
-        });
+        this.client.on("disconnected", () => clearTimeout(maintenanceTimeout));
 
-        // Inicializar en DB
+        // Guardar estado inicial en la base
         this.upsertSession("INIT");
 
+        // Inicializar cliente
         this.client.initialize();
 
         this.client.on("ready", () => {
@@ -100,7 +111,7 @@ class WhatsAppService {
             ses_id: this.sessionId,
             ses_qr: qr,
             ses_status: status,
-            ses_lastupdated: new Date()
+            ses_lastupdated: new Date(),
         });
     }
 

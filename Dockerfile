@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copiar dependencias y compilar
+# Instalar dependencias y compilar
 COPY package*.json ./
 RUN npm ci && npm cache clean --force
 
@@ -16,24 +16,28 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Instalar Chromium y dependencias críticas
+# Instalar Chromium y todas las dependencias críticas
+# Incluye bibliotecas de fuentes, renderizado y SSL
 RUN apk add --no-cache \
     chromium \
     nss \
     freetype \
+    freetype-dev \
     harfbuzz \
     ca-certificates \
-    ttf-freefont
+    ttf-freefont \
+    fontconfig \
+    libpng \
+    zlib-dev
 
-# Crear directorios temporales con permisos
-RUN mkdir -p /tmp/chromium-user-data /tmp/chromium-cache .wwebjs_auth && \
-    chmod -R 777 /tmp/chromium-user-data /tmp/chromium-cache .wwebjs_auth
+# Crear carpeta de sesiones y dar permisos totales
+RUN mkdir -p .wwebjs_auth && chmod -R 777 .wwebjs_auth
 
 # Instalar solo dependencias de producción
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# Copiar app compilada
+# Copiar app compilada y assets
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 

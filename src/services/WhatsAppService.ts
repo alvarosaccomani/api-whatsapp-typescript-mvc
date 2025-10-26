@@ -37,11 +37,21 @@ class WhatsAppService {
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
+                    '--no-first-run',
+                    '--no-zygote',
                     '--single-process',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    '--disable-features=VizDisplayCompositor',
+                    '--disable-ipc-flooding-protection',
+                    '--disable-web-security', // ⚠️ Solo en entornos aislados
+                    '--allow-running-insecure-content'
                 ]
             },
-            takeoverTimeoutMs: 60000,
+            takeoverTimeoutMs: 120000
         });
 
         // ✅ Reiniciar cliente cada 24h para liberar memoria

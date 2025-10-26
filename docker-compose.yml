@@ -19,6 +19,10 @@ services:
     networks:
       - pgvector_default
     mem_limit: 1g
+    shm_size: 1g
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     deploy:
       resources:
         limits:

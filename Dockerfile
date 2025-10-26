@@ -76,7 +76,7 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/cleanup.sh /app/entrypoint.sh
 
 # Variables de entorno para Puppeteer
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV NODE_ENV=production
 

@@ -36,6 +36,12 @@ class WhatsAppService {
         // ✅ Carpeta persistente de autenticación (dentro del contenedor)
         const authPath = "/app/.wwebjs_auth";
 
+        const chromiumPath = fs.existsSync("/usr/bin/chromium")
+            ? "/usr/bin/chromium"
+            : (fs.existsSync("/usr/bin/chromium-browser")
+                ? "/usr/bin/chromium-browser"
+                : "/usr/bin/google-chrome-stable");
+
         // ✅ Configuración del cliente optimizada para Docker
         this.client = new Client({
             authStrategy: new LocalAuth({
@@ -44,11 +50,7 @@ class WhatsAppService {
             }),
             puppeteer: {
                 headless: true,
-                executablePath:
-                    process.env.PUPPETEER_EXECUTABLE_PATH ||
-                    (existsSync("/usr/bin/chromium-browser")
-                        ? "/usr/bin/chromium-browser"
-                        : "/usr/bin/chromium"),
+                executablePath: chromiumPath,
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
@@ -65,7 +67,6 @@ class WhatsAppService {
                     "--disable-infobars",
                     "--disable-notifications",
                     "--disable-features=site-per-process,TranslateUI,BlinkGenPropertyTrees",
-                    "--single-process",
                     `--user-data-dir=${chromiumProfileDir}`,
                 ],
                 timeout: 60000,

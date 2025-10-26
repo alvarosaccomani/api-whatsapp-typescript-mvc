@@ -1,5 +1,6 @@
 import { Client, LocalAuth, MessageMedia } from "whatsapp-web.js";
 import * as fs from "fs";
+import { existsSync } from "fs";
 import * as path from "path";
 import { Session } from "../models/Session";
 
@@ -45,7 +46,9 @@ class WhatsAppService {
                 headless: true,
                 executablePath:
                     process.env.PUPPETEER_EXECUTABLE_PATH ||
-                    "/usr/bin/chromium", // el path correcto en Debian/Ubuntu slim
+                    (existsSync("/usr/bin/chromium-browser")
+                        ? "/usr/bin/chromium-browser"
+                        : "/usr/bin/chromium"),
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",

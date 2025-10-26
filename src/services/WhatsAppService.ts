@@ -28,16 +28,14 @@ class WhatsAppService {
     private constructor(sessionId: string) {
         this.sessionId = sessionId;
 
-        // Directorio temporal único para Chromium
+        // ✅ Carpeta temporal única para el perfil de Chromium
         const chromiumProfileDir = `/tmp/chromium_profile_${sessionId}_${Date.now()}`;
-        if (!fs.existsSync(chromiumProfileDir)) {
-            fs.mkdirSync(chromiumProfileDir, { recursive: true });
-        }
+        fs.mkdirSync(chromiumProfileDir, { recursive: true });
 
-        // Directorio persistente para las sesiones (dentro del contenedor)
-        const authPath = path.join(__dirname, "../../.wwebjs_auth");
+        // ✅ Carpeta persistente de autenticación (dentro del contenedor)
+        const authPath = "/app/.wwebjs_auth";
 
-        // Configuración del cliente
+        // ✅ Configuración del cliente optimizada para Docker
         this.client = new Client({
             authStrategy: new LocalAuth({
                 clientId: sessionId,
@@ -45,7 +43,9 @@ class WhatsAppService {
             }),
             puppeteer: {
                 headless: true,
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
+                executablePath:
+                    process.env.PUPPETEER_EXECUTABLE_PATH ||
+                    "/usr/bin/chromium", // el path correcto en Debian/Ubuntu slim
                 args: [
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
@@ -62,6 +62,7 @@ class WhatsAppService {
                     "--disable-infobars",
                     "--disable-notifications",
                     "--disable-features=site-per-process,TranslateUI,BlinkGenPropertyTrees",
+                    "--single-process",
                     `--user-data-dir=${chromiumProfileDir}`,
                 ],
                 timeout: 60000,
@@ -69,22 +70,13 @@ class WhatsAppService {
             takeoverTimeoutMs: 120000,
         });
 
-        // Estado inicial
+        // Guardar estado inicial
         this.upsertSession("INIT");
 
         // Inicializar cliente con control de errores
-        try {
-            console.log(`🚀 Inicializando sesión WhatsApp (${sessionId})...`);
-            this.client.initialize();
-        } catch (error) {
-            console.error(`❌ Error al inicializar WhatsApp (${sessionId}):`, error);
-            setTimeout(() => {
-                console.log(`♻️ Reintentando inicialización de sesión ${sessionId} en 10 segundos...`);
-                WhatsAppService.closeSession(sessionId);
-            }, 10000);
-        }
+        this.initializeClient();
 
-        // Reinicio automático cada 24h
+        // Reinicio automático cada 24h (buen mantenimiento)
         const maintenanceTimeout = setTimeout(() => {
             console.log(`🔄 Reiniciando sesión ${sessionId} por mantenimiento`);
             WhatsAppService.closeSession(sessionId);
@@ -92,7 +84,10 @@ class WhatsAppService {
 
         this.client.on("disconnected", () => clearTimeout(maintenanceTimeout));
 
-        // Eventos del cliente
+        // ==============================
+        // EVENTOS DEL CLIENTE
+        // ==============================
+
         this.client.on("ready", () => {
             this.status = "CONNECTED";
             this.upsertSession("CONNECTED");
@@ -108,7 +103,7 @@ class WhatsAppService {
         this.client.on("qr", (qr) => {
             this.status = "QR_NEEDED";
             this.upsertSession("QR_NEEDED", qr);
-            console.log(`📱 Escanea el QR para sesión ${sessionId}`);
+            console.log(`📱 Escaneá el QR para sesión ${sessionId}`);
         });
 
         this.client.on("disconnected", () => {
@@ -116,6 +111,22 @@ class WhatsAppService {
             this.upsertSession("DISCONNECTED");
             console.log(`🔌 Sesión ${sessionId} desconectada`);
         });
+    }
+
+    /**
+     * Inicializa el cliente con reintentos automáticos
+     */
+    private async initializeClient() {
+        try {
+            console.log(`🚀 Inicializando sesión WhatsApp (${this.sessionId})...`);
+            await this.client.initialize();
+        } catch (error: any) {
+            console.error(`❌ Error al inicializar WhatsApp (${this.sessionId}):`, error.message);
+            console.log(`♻️ Reintentando inicialización de sesión ${this.sessionId} en 10 segundos...`);
+            setTimeout(() => {
+                WhatsAppService.closeSession(this.sessionId);
+            }, 10000);
+        }
     }
 
     private async upsertSession(
@@ -130,6 +141,9 @@ class WhatsAppService {
         });
     }
 
+    /**
+     * Retorna o crea una instancia de sesión
+     */
     public static getInstance(sessionId: string): WhatsAppService {
         if (!WhatsAppService.instances.has(sessionId)) {
             WhatsAppService.instances.set(sessionId, new WhatsAppService(sessionId));
@@ -137,12 +151,18 @@ class WhatsAppService {
         return WhatsAppService.instances.get(sessionId)!;
     }
 
+    /**
+     * Enviar mensaje de texto
+     */
     public async sendMessage({ phone, message }: SendMessageInput) {
         if (this.status !== "CONNECTED") throw new Error("SESSION_NOT_READY");
         const response = await this.client.sendMessage(`${phone}@c.us`, message);
         return { id: response.id.id };
     }
 
+    /**
+     * Enviar mensaje multimedia
+     */
     public async sendMediaMessage({
         phone,
         caption = "",
@@ -150,7 +170,7 @@ class WhatsAppService {
         filePath,
         base64,
         mimeType = "image/jpeg",
-        filename = "image.jpg",
+        filename = "file.jpg",
     }: SendMediaMessageInput) {
         if (this.status !== "CONNECTED") throw new Error("SESSION_NOT_READY");
 
@@ -174,6 +194,9 @@ class WhatsAppService {
         return { id: response.id.id };
     }
 
+    /**
+     * Detección automática de tipo MIME
+     */
     private getMimeType(filename: string): string {
         const ext = path.extname(filename).toLowerCase();
         const mimeTypes: Record<string, string> = {
@@ -188,13 +211,17 @@ class WhatsAppService {
         return mimeTypes[ext] || "application/octet-stream";
     }
 
+    /**
+     * Cierra sesión y limpia recursos
+     */
     public static async closeSession(sessionId: string): Promise<void> {
         const instance = WhatsAppService.instances.get(sessionId);
         if (instance) {
             try {
                 await instance.client.destroy();
+                console.log(`🧹 Cliente ${sessionId} destruido correctamente.`);
             } catch (err) {
-                console.warn(`Error al destruir cliente ${sessionId}:`, err);
+                console.warn(`⚠️ Error al destruir cliente ${sessionId}:`, err);
             }
             WhatsAppService.instances.delete(sessionId);
         }

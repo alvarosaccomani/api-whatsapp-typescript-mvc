@@ -21,7 +21,7 @@ WORKDIR /app
 
 # Instalar Chromium y dependencias necesarias
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
+    chromium-browser \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \

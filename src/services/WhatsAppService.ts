@@ -37,12 +37,8 @@ class WhatsAppService {
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
-                    '--no-first-run',
-                    '--no-zygote',
                     '--single-process',
-                    '--disable-gpu',
-                    '--user-data-dir=/tmp/chromium-user-data',
-                    '--disk-cache-dir=/tmp/chromium-cache'
+                    '--disable-gpu'
                 ]
             },
             takeoverTimeoutMs: 60000,

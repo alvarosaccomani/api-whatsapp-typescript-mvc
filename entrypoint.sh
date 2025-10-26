@@ -20,4 +20,4 @@ fi
 
 # Ejecutar la API
 echo "✅ Ejecutando aplicación Node..."
-exec node dist/server.js
+exec node dist/app.js

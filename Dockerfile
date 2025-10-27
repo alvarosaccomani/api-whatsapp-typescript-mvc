@@ -58,6 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Crear carpeta de sesiones local (sin volumen)
 RUN mkdir -p /app/.wwebjs_auth && chmod -R 777 /app/.wwebjs_auth
+RUN mkdir -p /app/.wwebjs_profiles && chmod -R 777 /app/.wwebjs_profiles
 
 # Instalar dependencias de producción
 COPY package*.json ./

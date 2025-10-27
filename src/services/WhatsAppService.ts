@@ -30,8 +30,10 @@ class WhatsAppService {
         this.sessionId = sessionId;
 
         // ✅ Carpeta temporal única para el perfil de Chromium
-        const chromiumProfileDir = `/tmp/chromium_profile_${sessionId}_${Date.now()}`;
-        fs.mkdirSync(chromiumProfileDir, { recursive: true });
+        const chromiumProfileDir = path.join("/app/.wwebjs_profiles", sessionId);
+        if (!fs.existsSync(chromiumProfileDir)) {
+            fs.mkdirSync(chromiumProfileDir, { recursive: true });
+        }
 
         // ✅ Carpeta persistente de autenticación (dentro del contenedor)
         const authPath = "/app/.wwebjs_auth";
@@ -68,6 +70,12 @@ class WhatsAppService {
                     "--disable-notifications",
                     "--disable-features=site-per-process,TranslateUI,BlinkGenPropertyTrees",
                     `--user-data-dir=${chromiumProfileDir}`,
+                    `--profile-directory=Profile_${sessionId}`,
+                    `--remote-debugging-port=${Math.floor(9222 + Math.random() * 1000)}`,
+                    `--app=https://web.whatsapp.com`,
+                    `--disable-session-crashed-bubble`,
+                    `--no-default-browser-check`,
+                    `--no-startup-window`
                 ],
                 timeout: 60000,
             },

@@ -77,7 +77,7 @@ class WhatsAppService {
                     `--no-default-browser-check`,
                     `--no-startup-window`
                 ],
-                timeout: 60000,
+                timeout: 180000,
             },
             takeoverTimeoutMs: 120000,
         });
